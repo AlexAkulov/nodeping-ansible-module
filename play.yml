@@ -5,5 +5,10 @@
       nodeping-check-http:
         label: ya.ru
         url: http://ya.ru
+        interval: 30
         token: "{{ lookup('env','NODEPING_TOKEN') }}"
+        notifications:
+          - name: myslack
+            delay: 0
+            shedule: Days
         state: present
