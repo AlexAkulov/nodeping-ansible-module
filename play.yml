@@ -1,0 +1,9 @@
+- hosts: localhost
+  gather_facts: false
+  tasks:
+    - name: test nodeping
+      nodeping-check-http:
+        label: ya.ru
+        url: http://ya.ru
+        token: "{{ lookup('env','NODEPING_TOKEN') }}"
+        state: present
