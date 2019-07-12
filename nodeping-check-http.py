@@ -118,9 +118,14 @@ EXAMPLES = '''
         url: "{{ item.url }}"
         token: "{{ lookup('env','NODEPING_TOKEN') }}"
         notifications:
-          myslack:
+          - name: myslack
             delay: 0
-            schedule: Days
+            shedule: Days
+            type: contact
+          - name: general
+            delay: 0
+            shedule: All
+            type: group
         state: present
       with_items:
         - name: check ya.ru
@@ -143,6 +148,7 @@ from nodeping_api import delete_checks as nodeping_delete_checks
 from nodeping_api import create_check as nodeping_create_check
 from nodeping_api import update_checks as nodeping_update_checks
 from nodeping_api import get_contacts as nodeping_get_contacts
+from nodeping_api import group_contacts as nodeping_group_contacts
 
 def trim_suffix(s, suffix):
     if s.endswith(suffix):
@@ -155,22 +161,34 @@ def get_check_by_label(checks_list, label):
             return value
     return {}
 
-def notifications_converter(contacts_list, module):
+def get_notifications(module):
+    contact_list = nodeping_get_contacts.get_all(module.params['token'])
+    group_contact_list = nodeping_group_contacts.get_all(module.params['token'])
+
     result = []
-    contacts = module.params['notifications']
-    if not contacts:
+    ansible_contacts = module.params['notifications']
+    if not ansible_contacts:
         return result
 
-    for contact in contacts:
-        for key, value in contacts_list.items():
-            if contact['name'] != value['name']:
-                continue
-            for contact_id, v in value.get('addresses', {}).items():
-                result.append({
-                    contact_id: {
-                        "delay": value.get('delay', 0),
-                        "schedule": value.get('shedule', 'Days')
-                        }})
+    for ansible_contact in ansible_contacts:
+        if ansible_contact.get('type', 'contact') == 'contact':
+            for key, value in contact_list.items():
+                if ansible_contact['name'] != value['name']:
+                    continue
+                for contact_id, v in value.get('addresses', {}).items():
+                    result.append({
+                        contact_id: {
+                            "delay": value.get('delay', 0),
+                            "schedule": value.get('shedule', 'All')
+                            }})
+        else:
+            for group_contact_id, group_contact in group_contact_list.items():
+                if ansible_contact['name'] == group_contact['name']:
+                    result.append({
+                        group_contact_id: {
+                            "delay": value.get('delay', 0),
+                            "schedule": value.get('shedule', 'All')
+                            }})
     return result
 
 def create_check(contacts, module):
@@ -249,8 +267,7 @@ def main():
         )
     )
     checks_list = nodeping_get_checks.GetChecks(module.params['token']).all_checks()
-    contacts_list = nodeping_get_contacts.get_all(module.params['token'])
-    contacts = notifications_converter(contacts_list, module)
+    contacts = get_notifications(module)
 
     # module.fail_json(msg=contacts_list)
 
